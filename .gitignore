@@ -139,6 +139,7 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+<<<<<<< HEAD
 # MacOS - General
 .DS_Store
 .AppleDouble
@@ -168,3 +169,5 @@ Temporary Items
 
 # SSDTs folder
 SSDTs
+=======
+>>>>>>> cdcefa0 (Added gitignore)

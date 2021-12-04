@@ -7,6 +7,9 @@ import subprocess, time
 # SubModules
 from modules import *
 
+from SSDTTime.SSDTTime import SSDT
+
+
 version = "v1.1"
 rootdir = os.getcwd()
 ssdt_dir = os.path.join(rootdir, 'SSDTs')
@@ -87,14 +90,19 @@ os.chdir(ssdttime_dir)
 if os.path.exists(f'{ssdttime_dir}/Results'):
 	shutil.rmtree(f'{ssdttime_dir}/Results')
 
-ssdttime = subprocess.Popen(['./SSDTTime.command'], stdin=subprocess.PIPE, encoding='utf8')
-ssdttime.stdin.write('D\n')
-ssdttime.stdin.write(f'{dsdt_path}\n')
-ssdttime.stdin.write('2\n')
-ssdttime.stdin.write('4\n')
-ssdttime.stdin.write('5\n')
-ssdttime.stdin.write('6\n')
-ssdttime.communicate('Q\n')
+# ssdttime = subprocess.Popen(['./SSDTTime.command'], stdin=subprocess.PIPE, encoding='utf8')
+# ssdttime.stdin.write('D\n')
+# ssdttime.stdin.write(f'{dsdt_path}\n')
+# ssdttime.stdin.write('2\n')
+# ssdttime.stdin.write('4\n')
+# ssdttime.stdin.write('5\n')
+# ssdttime.stdin.write('6\n')
+# ssdttime.communicate('Q\n')
+
+SSDTTime_istance = SSDT()
+SSDTTime_istance.fake_ec()
+# BUG: Va sistemato il sys.stdin.write(f'{dsdt_path}\n') dato che non ho idea di come si possa fixare il manual input del DSDT.aml
+
 os.system(f'cp {ssdttime_dir}/Results/*.aml {ssdt_dir}')
 os.chdir(rootdir)
 os.system('clear')

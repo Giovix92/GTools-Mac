@@ -37,10 +37,14 @@ if args.rebuild_iasl:
 		print('No previous binary files were found.')
 
 if args.iasl_bin != 'iasl-stable':
-	if not os.path.exists(f'{downloader.iasl_bin_path}/{args.iasl_bin}'):
-		if not args.iasl_bin in ('iasl-stable', 'iasl-legacy', 'iasl-dev') and args.rebuild_iasl: #BUG: actually specifying a custom iasl binary by abspath raises the invalid binary error
-			print('Invalid selected iasl binary. Exiting.')
-			sys.exit(1)
+	if os.path.exists(f'{args.iasl_bin}'):
+		# Use abspath
+		iasl_bin = args.iasl_bin
+	elif os.path.exists(f'{downloader.iasl_bin_path}/{args.iasl_bin}'):
+		iasl_bin = f'{downloader.iasl_bin_path}/{args.iasl_bin}'
+	elif not args.iasl_bin in ('iasl-stable', 'iasl-legacy', 'iasl-dev') and args.rebuild_iasl:
+		print('Invalid selected iasl binary. Exiting.')
+		sys.exit(1)
 
 if args.SysReport is None:
 	print('You must specify a SysReport folder. Exiting.')
@@ -74,7 +78,7 @@ if args.skip_ssdtgen is False:
 	if os.path.exists(ssdt_dir):
 		shutil.rmtree(ssdt_dir)
 	os.mkdir(ssdt_dir)
-	tbp = {'dsdt': f'{dsdt_path}', 'iasl_bin': f'{downloader.iasl_bin_path}/{args.iasl_bin}'}
+	tbp = {'dsdt': f'{dsdt_path}', 'iasl_bin': f'{iasl_bin}'}
 	mkssdt.main(tbp)
 else:
 	print('DSDT decompilation and SSDT generation has been disabled via flag.')

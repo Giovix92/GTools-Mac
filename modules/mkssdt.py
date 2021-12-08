@@ -10,7 +10,6 @@ version = 'v1.0'
 dsdt       = None
 dsdt_raw   = None
 dsdt_lines = None
-dsdt_scope = []
 dsdt_paths = []
 
 ### FUNCTIONS - START ###
@@ -28,6 +27,7 @@ def get_hex(line):
 
 def get_line(line):
 	# Strip the header and commented end - no space replacing though
+	# I don't actually have enough enabled brain cells to create a single line return statement
 	line = line.split('//')[0]
 	return line.split(':')[1] if ':' in line else line
 
@@ -35,11 +35,7 @@ def get_hex_bytes(line):
 	return binascii.unhexlify(line)
 
 def get_path_of_type(dsdt_paths, obj_type='Device', obj='HPET'):
-	paths = []
-	for path in dsdt_paths:
-		if path[2].lower() == obj_type.lower() and path[0].upper().endswith(obj.upper()):
-			paths.append(path)
-	return sorted(paths)
+	return sorted([path for path in dsdt_paths if path[2].lower() == obj_type.lower() and path[0].upper().endswith(obj.upper())])
 
 def get_device_paths(dsdt_paths, obj='HPET'):
 	return get_path_of_type(dsdt_paths, obj_type='Device',obj=obj)
@@ -749,13 +745,17 @@ def main(args):
 	iasl_bin = args['iasl_bin']
 	print(f'Decompiling {dsdt}...')
 	tmp_dir = os.path.join(os.getcwd(), 'tmp')
-	if os.path.exists(tmp_dir):
-		shutil.rmtree(tmp_dir)
-	os.mkdir(tmp_dir)
+	shutil.rmtree(tmp_dir) if os.path.exists(tmp_dir) else os.mkdir(tmp_dir)
+
 	results_folder = os.path.join(os.getcwd(), 'SSDTs')
+	
+	# Thx python for fucking up stuff even when a fucking single line if could solve things. really appreciate that tbf
+	# shutil.rmtree(results_folder) if os.path.exists(results_folder) else os.mkdir(results_folder)
+	
 	if os.path.exists(results_folder):
 		shutil.rmtree(results_folder)
 	os.mkdir(results_folder)
+	
 	subprocess.check_call(['cp', f'{dsdt}', f'{tmp_dir}'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 	subprocess.check_call([f'{iasl_bin}', '-da', '-dl', '-l', f'{tmp_dir}/DSDT.aml'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
@@ -764,34 +764,30 @@ def main(args):
 
 	# dsdt.load() - dsl part
 	dsdt_dsl = os.path.join(tmp_dir, 'DSDT.dsl')
-	with open(dsdt_dsl, 'r') as f:
-		dsdt = f.read()
-		dsdt_lines = dsdt.split('\n')
+	
+	dsdt = open(dsdt_dsl, 'r').read()
+	dsdt_lines = dsdt.split('\n')
 
-		# dsdt.get_scopes()
-		for index,line in enumerate(dsdt_lines):
-			if is_hex(line): continue
-			if any(x in line for x in ('Processor (','Scope (','Device (','Method (','Name (')):
-				dsdt_scope.append((line,index))
-
-	# dsdt.get_paths()
+	global dsdt_scope
+	dsdt_scope = [(line,index) for index,line in enumerate(dsdt_lines) if any(x in line for x in ('Processor (','Scope (','Device (','Method (','Name (')) if not is_hex(line)]
+		
+	#Unfortunately continue statement cannot be used inside a list comprehension for whatever reason...
 	starting_indexes = []
 	for index,scope in enumerate(dsdt_scope):
 		if not scope[0].strip().startswith(('Processor (','Device (','Method (','Name (')): continue
 		# Got a device - add its index
 		starting_indexes.append(index)
-	if not len(starting_indexes): return None
-	paths = []
-	for x in starting_indexes:
-		paths.append(get_path_starting_at(x))
-	paths = sorted(paths)
-	dsdt_paths = paths
 
-	write_ssdt('SSDT-EC', fake_ec(dsdt_lines, dsdt_paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-PLUG', plugin_type(dsdt_lines, dsdt_paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-PMC', ssdt_pmc(dsdt_lines, dsdt_paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-AWAC', ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw), iasl_bin, results_folder)
-	write_ssdt('SSDT-USB-Reset', ssdt_rhub(dsdt_lines, dsdt_paths, dsdt_raw), iasl_bin, results_folder)
+
+	# starting_indexes = [index for index,scope in enumerate(dsdt_scope) if not scope[0].strip().startswith(('Processor (','Device (','Method (','Name ('))]
+	if not len(starting_indexes): return None
+	paths = sorted([get_path_starting_at(x) for x in starting_indexes])
+
+	write_ssdt('SSDT-EC', fake_ec(dsdt_lines, paths), iasl_bin, results_folder)
+	write_ssdt('SSDT-PLUG', plugin_type(dsdt_lines, paths), iasl_bin, results_folder)
+	write_ssdt('SSDT-PMC', ssdt_pmc(dsdt_lines, paths), iasl_bin, results_folder)
+	write_ssdt('SSDT-AWAC', ssdt_awac(dsdt_lines, paths, dsdt_raw), iasl_bin, results_folder)
+	write_ssdt('SSDT-USB-Reset', ssdt_rhub(dsdt_lines, paths, dsdt_raw), iasl_bin, results_folder)
 
 	shutil.rmtree(tmp_dir)
 

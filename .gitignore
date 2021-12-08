@@ -168,3 +168,6 @@ Temporary Items
 
 # SSDTs folder
 SSDTs
+SysReport
+Results
+utils/iasl/acpica/

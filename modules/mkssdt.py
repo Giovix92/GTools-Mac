@@ -353,6 +353,7 @@ Scope ([[LPCName]])
 		}
 	}
 }
+}
 '''.replace('[[LPCName]]',lpc_name)
 	return ssdt
 

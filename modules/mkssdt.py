@@ -196,7 +196,6 @@ def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
 	temporary_dsl_path = os.path.join(results_folder, ssdt_name+'.dsl')
 	with open(temporary_dsl_path, 'w') as f:
 		f.write(ssdt)
-	
 	print('Compiling...')
 	try:
 		subprocess.check_call([f'{iasl_bin}', f'{temporary_dsl_path}'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
@@ -338,9 +337,7 @@ Scope ([[CPUName]])
 def ssdt_pmc(dsdt_lines, dsdt_paths):
 	print('\nLocating LPC(B)/SBRG...')
 	ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
-	lpc_name = None
-	if len(ec_list):
-		lpc_name = '.'.join(ec_list[0][0].split('.')[:-1])
+	lpc_name = '.'.join(ec_list[0][0].split('.')[:-1]) if len(ec_list) else None
 	if lpc_name == None:
 		for x in ('LPCB', 'LPC0', 'LPC', 'SBRG', 'PX40'):
 			try:
@@ -420,7 +417,6 @@ def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
 		print(' --> Generating _STA to XSTA patch')
 		sta_index = find_next_hex(dsdt_lines, sta[0][1])[1]
 		print(f' ----> Found at index {sta_index}')
-		sta_hex  = '5F535441'
 
 	print('Locating PNP0B00 (RTC) devices...')
 	rtc_list  = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0B00')

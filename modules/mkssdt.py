@@ -6,7 +6,7 @@ import os, sys, shutil
 import subprocess, time
 import binascii, getpass
 
-version = 'v1.0'
+version = 'v1.2'
 dsdt       = None
 dsdt_raw   = None
 dsdt_lines = None
@@ -64,8 +64,7 @@ def get_device_paths_with_hid(dsdt_lines, dsdt_paths, hid='ACPI000E'):
 			if 'Device (' in line and len(line)-len(line.lstrip(' ')) < pad:
 				# Add it if it's already in our dsdt_paths - if not, add the current line
 				device = next((x for x in dsdt_paths if x[1]==i-sub),None)
-				if device: devices.append(device)
-				else: devices.append((line,i-sub))
+				devices = [device if device else (line,i-sub)]
 				break
 	return devices
 
@@ -211,7 +210,7 @@ def get_unique_pad(dsdt_lines, dsdt_raw, current_hex, index, direction=None, ins
 	start_index = index
 	line,last_index = get_hex_starting_at(dsdt_lines, index)
 	if not current_hex in line:
-		raise Exception('{} not found in DSDT at index {}-{}!'.format(current_hex,start_index,last_index))
+		raise Exception(f'{current_hex} not found in DSDT at index {start_index}-{last_index}!')
 	padl = padr = ''
 	parts = line.split(current_hex)
 	if instance >= len(parts)-1:
@@ -251,14 +250,16 @@ def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
 		print(f'Unable to generate {ssdt_name}!')
 		return
 	temporary_dsl_path = os.path.join(results_folder, ssdt_name+'.dsl')
-	with open(temporary_dsl_path, 'w') as f:
-		f.write(ssdt)
+	temporary_dsl_path_fo = open(temporary_dsl_path, 'w')
+	temporary_dsl_path_fo.write(ssdt)
+	
 	print('Compiling...')
 	try:
 		subprocess.check_call([f'{iasl_bin}', f'{temporary_dsl_path}'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 	except:
 		print(f'Unable to compile {ssdt_name}!')
 		return
+	temporary_dsl_path_fo.close()
 	return True
 
 def fake_ec(dsdt_lines, dsdt_paths):
@@ -269,11 +270,11 @@ def fake_ec(dsdt_lines, dsdt_paths):
 	lpc_name = None
 	if len(ec_list):
 		lpc_name = '.'.join(ec_list[0][0].split('.')[:-1])
-		print(' - Got {}'.format(len(ec_list)))
+		print(f' - Got {len(ec_list)}')
 		print(' - Validating...')
 		for x in ec_list:
 			device = x[0]
-			print(' --> {}'.format(device))
+			print(f' --> {device}')
 			if device.split('.')[-1] == 'EC':
 				print(' ----> EC called EC. Renaming')
 				device = '.'.join(device.split('.')[:-1]+['EC0'])
@@ -300,7 +301,7 @@ def fake_ec(dsdt_lines, dsdt_paths):
 		print(' - Could not locate LPC(B)! Aborting!')
 		print('')
 		return False
-	print(' - Found {}'.format(lpc_name))
+	print(f' - Found {lpc_name}')
 	comment = 'SSDT-EC'
 	oc = {'Comment':comment,'Enabled':True,'Path':'SSDT-EC.aml'}
 	print('Creating SSDT-EC...')
@@ -310,7 +311,7 @@ DefinitionBlock ("", "SSDT", 2, "CORP ", "SsdtEC", 0x00001000)
 External ([[LPCName]], DeviceObj)
 '''.replace('[[LPCName]]',lpc_name)
 	for x in ec_to_patch:
-		ssdt += '    External ({}, DeviceObj)\n'.format(x)
+		ssdt += f'    External ({x}, DeviceObj)\n'
 	# Walk them again and add the _STAs
 	for x in ec_to_patch:
 		ssdt += '''
@@ -363,7 +364,7 @@ def plugin_type(dsdt_lines, dsdt_paths):
 		print('')
 		return False
 	else:
-		print(' - Found {}'.format(cpu_name))
+		print(f' - Found {cpu_name}')
 	print('Creating SSDT-PLUG...')
 	ssdt = '''
 //
@@ -412,7 +413,7 @@ def ssdt_pmc(dsdt_lines, dsdt_paths):
 		print(' - Could not locate LPC(B)! Aborting!')
 		print('')
 		return False
-	print(' - Found {}'.format(lpc_name))
+	print(f' - Found {lpc_name}')
 	print('Creating SSDT-PMC...')
 	ssdt = '''//
 // SSDT-PMC source from Acidanthera
@@ -461,13 +462,12 @@ def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
 		return False
 	awac = awac_list[0]
 	root = awac[0].split('.')[0]
-	print(' - Found {}'.format(awac[0]))
+	print(f' - Found {awac[0]}')
 	print(' --> Verifying _STA...')
 	sta  = get_method_paths(dsdt_paths, awac[0]+'._STA')
 	xsta = get_method_paths(dsdt_paths, awac[0]+'.XSTA')
 	has_stas = False
 	lpc_name = None
-	patches = []
 	if not len(sta) and len(xsta):
 		print(' --> _STA already renamed to XSTA!  Aborting!')
 		print('')
@@ -485,17 +485,16 @@ def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
 	if len(sta) and not has_stas:
 		print(' --> Generating _STA to XSTA patch')
 		sta_index = find_next_hex(dsdt_lines, sta[0][1])[1]
-		print(' ----> Found at index {}'.format(sta_index))
+		print(f' ----> Found at index {sta_index}')
 		sta_hex  = '5F535441'
 		xsta_hex = '58535441'
 		padl,padr = get_shortest_unique_pad(dsdt_lines, dsdt_raw, sta_hex, sta_index)
-		patches.append({'Comment':'AWAC _STA to XSTA Rename','Find':padl+sta_hex+padr,'Replace':padl+xsta_hex+padr})
 	print('Locating PNP0B00 (RTC) devices...')
 	rtc_list  = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0B00')
 	rtc_fake = True
 	if len(rtc_list):
 		rtc_fake = False
-		print(' - Found at {}'.format(rtc_list[0][0]))
+		print(f' - Found at {rtc_list[0][0]}')
 	else: print(' - None found - fake needed!')
 	if rtc_fake:
 		print('Locating LPC(B)/SBRG...')
@@ -624,16 +623,15 @@ def ssdt_rhub(dsdt_lines, dsdt_paths, dsdt_raw):
 		print(' - None found!  Aborting...')
 		print('')
 		return False
-	print(' - Found {:,}'.format(len(rhubs)))
+	print(f' - Found {len(rhubs)}')
 	# Gather some info
-	patches = []
 	tasks = []
 	used_names = []
 	xhc_num = 2
 	ehc_num = 1
 	for x in rhubs:
 		task = {'device':x[0]}
-		print(' --> {}'.format('.'.join(x[0].split('.')[:-1])))
+		print(f''' --> {'.'.join(x[0].split('.')[:-1])}''')
 		name = x[0].split('.')[-2]
 		if name in illegal_names or name in used_names:
 			print(' ----> Needs rename!')
@@ -654,11 +652,10 @@ def ssdt_rhub(dsdt_lines, dsdt_paths, dsdt_raw):
 		if len(sta_method):
 			print(' ----> Generating _STA to XSTA patch')
 			sta_index = find_next_hex(dsdt_lines, sta_method[0][1])[1]
-			print(' ------> Found at index {}'.format(sta_index))
+			print(f' ------> Found at index {sta_index}')
 			sta_hex  = '5F535441'
 			xsta_hex = '58535441'
 			padl,padr = get_shortest_unique_pad(dsdt_lines, dsdt_raw, sta_hex, sta_index)
-			patches.append({'Comment':'{} _STA to XSTA Rename'.format(task['device'].split('.')[-1]),'Find':padl+sta_hex+padr,'Replace':padl+xsta_hex+padr})
 		# Let's try to get the _ADR
 		scope_adr = get_name_paths(dsdt_paths, task['device']+'._ADR')
 		task['address'] = dsdt_lines[scope_adr[0][1]].strip() if len(scope_adr) else 'Name (_ADR, Zero)  // _ADR: Address'
@@ -673,9 +670,9 @@ DefinitionBlock ("", "SSDT", 2, "CORP", "UsbReset", 0x00001000)
 	# Gather the parents first - ensure they're unique, and put them in order
 	parents = sorted(list(set([x['parent'] for x in tasks if x.get('parent',None)])))
 	for x in parents:
-		ssdt += '    External ({}, DeviceObj)\n'.format(x)
+		ssdt += f'    External ({x}, DeviceObj)\n'
 	for x in tasks:
-		ssdt += '    External ({}, DeviceObj)\n'.format(x['device'])
+		ssdt += f'''    External ({x['device']}, DeviceObj)\n'''
 	# Let's walk them again and disable RHUBs and rename
 	for x in tasks:
 		if x.get('rename',None):
@@ -744,28 +741,28 @@ def main(args):
 	dsdt = args['dsdt']
 	iasl_bin = args['iasl_bin']
 	print(f'Decompiling {dsdt}...')
+
 	tmp_dir = os.path.join(os.getcwd(), 'tmp')
-	shutil.rmtree(tmp_dir) if os.path.exists(tmp_dir) else os.mkdir(tmp_dir)
+	shutil.rmtree(tmp_dir) if os.path.exists(tmp_dir) else None
+	os.mkdir(tmp_dir)
 
 	results_folder = os.path.join(os.getcwd(), 'SSDTs')
 	
-	# Thx python for fucking up stuff even when a fucking single line if could solve things. really appreciate that tbf
-	# shutil.rmtree(results_folder) if os.path.exists(results_folder) else os.mkdir(results_folder)
-	
-	if os.path.exists(results_folder):
-		shutil.rmtree(results_folder)
+	shutil.rmtree(results_folder) if os.path.exists(results_folder) else None
 	os.mkdir(results_folder)
 	
 	subprocess.check_call(['cp', f'{dsdt}', f'{tmp_dir}'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 	subprocess.check_call([f'{iasl_bin}', '-da', '-dl', '-l', f'{tmp_dir}/DSDT.aml'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
 	# dsdt.load() - aml part
-	dsdt_raw = open(dsdt, 'rb').read()
+	dsdt_raw_fo = open(dsdt, 'rb')
+	dsdt_raw = dsdt_raw_fo.read()
 
 	# dsdt.load() - dsl part
 	dsdt_dsl = os.path.join(tmp_dir, 'DSDT.dsl')
 	
-	dsdt = open(dsdt_dsl, 'r').read()
+	dsdt_fo = open(dsdt_dsl, 'r')
+	dsdt = dsdt_fo.read()
 	dsdt_lines = dsdt.split('\n')
 
 	global dsdt_scope
@@ -779,7 +776,6 @@ def main(args):
 		starting_indexes.append(index)
 
 
-	# starting_indexes = [index for index,scope in enumerate(dsdt_scope) if not scope[0].strip().startswith(('Processor (','Device (','Method (','Name ('))]
 	if not len(starting_indexes): return None
 	paths = sorted([get_path_starting_at(x) for x in starting_indexes])
 
@@ -790,6 +786,8 @@ def main(args):
 	write_ssdt('SSDT-USB-Reset', ssdt_rhub(dsdt_lines, paths, dsdt_raw), iasl_bin, results_folder)
 
 	shutil.rmtree(tmp_dir)
+	dsdt_raw_fo.close()
+	dsdt_fo.close()
 
 # The parser is only called if this script is called as a script/executable (via command line) but not when imported by another script
 if __name__=='__main__':

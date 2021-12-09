@@ -250,8 +250,8 @@ def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
 		print(f'Unable to generate {ssdt_name}!')
 		return
 	temporary_dsl_path = os.path.join(results_folder, ssdt_name+'.dsl')
-	temporary_dsl_path_fo = open(temporary_dsl_path, 'w')
-	temporary_dsl_path_fo.write(ssdt)
+	with open(temporary_dsl_path, 'w') as f:
+		f.write(ssdt)
 	
 	print('Compiling...')
 	try:
@@ -259,7 +259,6 @@ def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
 	except:
 		print(f'Unable to compile {ssdt_name}!')
 		return
-	temporary_dsl_path_fo.close()
 	return True
 
 def fake_ec(dsdt_lines, dsdt_paths):

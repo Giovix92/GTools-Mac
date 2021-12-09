@@ -188,63 +188,6 @@ def get_hex_ending_at(dsdt_lines, start_index):
 		index = start_index-i
 	return (hex_text, index)
 
-def get_shortest_unique_pad(dsdt_lines, dsdt_raw, current_hex, index, instance=0):
-	try:    left_pad  = get_unique_pad(dsdt_lines, dsdt_raw, current_hex, index, False, instance)
-	except: left_pad  = None
-	try:    right_pad = get_unique_pad(dsdt_lines, dsdt_raw, current_hex, index, True, instance)
-	except: right_pad = None
-	try:    mid_pad   = get_unique_pad(dsdt_lines, dsdt_raw, current_hex, index, None, instance)
-	except: mid_pad   = None
-	if left_pad == right_pad == mid_pad == None: raise Exception('No unique pad found!')
-	# We got at least one unique pad
-	min_pad = None
-	for x in (left_pad,right_pad,mid_pad):
-		if x == None: continue # Skip
-		if min_pad == None or len(x[0]+x[1]) < len(min_pad[0]+min_pad[1]):
-			min_pad = x
-	return min_pad
-
-def get_unique_pad(dsdt_lines, dsdt_raw, current_hex, index, direction=None, instance=0):
-	# Returns any pad needed to make the passed patch unique
-	# direction can be True = forward, False = backward, None = both
-	start_index = index
-	line,last_index = get_hex_starting_at(dsdt_lines, index)
-	if not current_hex in line:
-		raise Exception(f'{current_hex} not found in DSDT at index {start_index}-{last_index}!')
-	padl = padr = ''
-	parts = line.split(current_hex)
-	if instance >= len(parts)-1:
-		raise Exception('Instance out of range!')
-	linel = current_hex.join(parts[0:instance+1])
-	liner = current_hex.join(parts[instance+1:])
-	last_check = True # Default to forward
-	while True:
-		# Check if our hex string is unique
-		check_bytes = get_hex_bytes(padl+current_hex+padr)
-		if dsdt_raw.count(check_bytes) == 1: # Got it!
-			break
-		if direction == True or (direction == None and len(padr)<=len(padl)):
-			# Let's check a forward byte
-			if not len(liner):
-				# Need to grab more
-				liner, _index, last_index = find_next_hex(dsdt_lines, last_index)
-				if last_index == -1: raise Exception('Hit end of file before unique hex was found!')
-			padr  = padr+liner[0:2]
-			liner = liner[2:]
-			continue
-		if direction == False or (direction == None and len(padl)<=len(padr)):
-			# Let's check a backward byte
-			if not len(linel):
-				# Need to grab more
-				linel, start_index, _index = find_previous_hex(dsdt_lines, start_index)
-				if _index == -1: raise Exception('Hit end of file before unique hex was found!')
-			padl  = linel[-2:]+padl
-			linel = linel[:-2]
-			continue
-		break
-	return (padl,padr)
-
-
 def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
 	if not ssdt:
 		print(f'Unable to generate {ssdt_name}!')
@@ -262,8 +205,7 @@ def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
 	return True
 
 def fake_ec(dsdt_lines, dsdt_paths):
-	print('')
-	print('Locating PNP0C09 (EC) devices...')
+	print('\nLocating PNP0C09 (EC) devices...')
 	ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
 	ec_to_patch  = []
 	lpc_name = None
@@ -297,8 +239,7 @@ def fake_ec(dsdt_lines, dsdt_paths):
 				break
 			except: pass
 	if not lpc_name:
-		print(' - Could not locate LPC(B)! Aborting!')
-		print('')
+		print(' - Could not locate LPC(B)! Aborting!\n')
 		return False
 	print(f' - Found {lpc_name}')
 	comment = 'SSDT-EC'
@@ -354,13 +295,11 @@ Scope ([[LPCName]])
 	return ssdt
 
 def plugin_type(dsdt_lines, dsdt_paths):
-	print('')
-	print('Determining CPU name scheme...')
+	print('\nDetermining CPU name scheme...')
 	try: cpu_name = get_processor_paths(dsdt_paths, '')[0][0]
 	except: cpu_name = None
 	if not cpu_name:
-		print(' - Could not locate Processor object! Aborting!')
-		print('')
+		print(' - Could not locate Processor object! Aborting!\n')
 		return False
 	else:
 		print(f' - Found {cpu_name}')
@@ -396,8 +335,7 @@ Scope ([[CPUName]])
 	return ssdt
 
 def ssdt_pmc(dsdt_lines, dsdt_paths):
-	print('')
-	print('Locating LPC(B)/SBRG...')
+	print('\nLocating LPC(B)/SBRG...')
 	ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
 	lpc_name = None
 	if len(ec_list):
@@ -409,8 +347,7 @@ def ssdt_pmc(dsdt_lines, dsdt_paths):
 				break
 			except: pass
 	if not lpc_name:
-		print(' - Could not locate LPC(B)! Aborting!')
-		print('')
+		print(' - Could not locate LPC(B)! Aborting!\n')
 		return False
 	print(f' - Found {lpc_name}')
 	print('Creating SSDT-PMC...')
@@ -452,12 +389,10 @@ Scope ([[LPCName]])
 	return ssdt
 
 def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
-	print('')
-	print('Locating ACPI000E (AWAC) devices...')
+	print('\nLocating ACPI000E (AWAC) devices...')
 	awac_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'ACPI000E')
 	if not len(awac_list):
-		print(' - Could not locate any ACPI000E devices!  SSDT-AWAC not needed!')
-		print('')
+		print(' - Could not locate any ACPI000E devices!  SSDT-AWAC not needed!\n')
 		return False
 	awac = awac_list[0]
 	root = awac[0].split('.')[0]
@@ -468,8 +403,7 @@ def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
 	has_stas = False
 	lpc_name = None
 	if not len(sta) and len(xsta):
-		print(' --> _STA already renamed to XSTA!  Aborting!')
-		print('')
+		print(' --> _STA already renamed to XSTA!  Aborting!\n')
 		return False
 	if len(sta):
 		scope = '\n'.join(get_scope(dsdt_lines, sta[0][1], strip_comments=True))
@@ -486,11 +420,11 @@ def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
 		sta_index = find_next_hex(dsdt_lines, sta[0][1])[1]
 		print(f' ----> Found at index {sta_index}')
 		sta_hex  = '5F535441'
-		xsta_hex = '58535441'
-		padl,padr = get_shortest_unique_pad(dsdt_lines, dsdt_raw, sta_hex, sta_index)
+
 	print('Locating PNP0B00 (RTC) devices...')
 	rtc_list  = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0B00')
 	rtc_fake = True
+
 	if len(rtc_list):
 		rtc_fake = False
 		print(f' - Found at {rtc_list[0][0]}')
@@ -507,8 +441,7 @@ def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
 					break
 				except: pass
 		if not lpc_name:
-			print(' - Could not locate LPC(B)! Aborting!')
-			print('')
+			print(' - Could not locate LPC(B)! Aborting!\n')
 			return False
 	# At this point - we need to do the following:
 	# 1. Change STAS if needed
@@ -613,14 +546,12 @@ Scope ([[LPCName]])
 
 def ssdt_rhub(dsdt_lines, dsdt_paths, dsdt_raw):
 	illegal_names = ('XHC1','EHC1','EHC2','PXSX')
-	print('')
-	print('Gathering RHUB/HUBN/URTH devices...')
+	print('\nGathering RHUB/HUBN/URTH devices...')
 	rhubs = get_device_paths(dsdt_paths, 'RHUB')
 	rhubs.extend(get_device_paths(dsdt_paths, 'HUBN'))
 	rhubs.extend(get_device_paths(dsdt_paths, 'URTH'))
 	if not len(rhubs):
-		print(' - None found!  Aborting...')
-		print('')
+		print(' - None found!  Aborting...\n')
 		return False
 	print(f' - Found {len(rhubs)}')
 	# Gather some info
@@ -652,9 +583,6 @@ def ssdt_rhub(dsdt_lines, dsdt_paths, dsdt_raw):
 			print(' ----> Generating _STA to XSTA patch')
 			sta_index = find_next_hex(dsdt_lines, sta_method[0][1])[1]
 			print(f' ------> Found at index {sta_index}')
-			sta_hex  = '5F535441'
-			xsta_hex = '58535441'
-			padl,padr = get_shortest_unique_pad(dsdt_lines, dsdt_raw, sta_hex, sta_index)
 		# Let's try to get the _ADR
 		scope_adr = get_name_paths(dsdt_paths, task['device']+'._ADR')
 		task['address'] = dsdt_lines[scope_adr[0][1]].strip() if len(scope_adr) else 'Name (_ADR, Zero)  // _ADR: Address'
@@ -669,7 +597,7 @@ DefinitionBlock ("", "SSDT", 2, "CORP", "UsbReset", 0x00001000)
 	# Gather the parents first - ensure they're unique, and put them in order
 	parents = sorted(list(set([x['parent'] for x in tasks if x.get('parent',None)])))
 	for x in parents:
-		ssdt += f'    External ({x}, DeviceObj)\n'
+		ssdt += f'    External ({x}, DeviceObj)\n' 
 	for x in tasks:
 		ssdt += f'''    External ({x['device']}, DeviceObj)\n'''
 	# Let's walk them again and disable RHUBs and rename

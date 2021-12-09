@@ -1,10 +1,11 @@
 # Copyright (C) 2021-2022 Giovix92
 
 import argparse
-import getopt, re
-import os, sys, shutil
-import subprocess, time
-import binascii, getpass
+import os
+import shutil
+import subprocess
+import sys
+import binascii
 
 version = 'v1.2'
 dsdt       = None

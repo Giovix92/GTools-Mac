@@ -36,15 +36,8 @@ if args.rebuild_iasl:
 	else:
 		print('No previous binary files were found.')
 
-if args.iasl_bin != 'iasl-stable':
-	if os.path.exists(f'{args.iasl_bin}'):
-		# Use abspath
-		iasl_bin = args.iasl_bin
-	elif os.path.exists(f'{downloader.iasl_bin_path}/{args.iasl_bin}'):
-		iasl_bin = f'{downloader.iasl_bin_path}/{args.iasl_bin}'
-	elif not args.iasl_bin in ('iasl-stable', 'iasl-legacy', 'iasl-dev') and args.rebuild_iasl:
-		print('Invalid selected iasl binary. Exiting.')
-		sys.exit(1)
+iasl_bin = args.iasl_bin if os.path.exists(f'{args.iasl_bin}') else f'{downloader.iasl_bin_path}/{args.iasl_bin}' if os.path.exists(f'{downloader.iasl_bin_path}/{args.iasl_bin}') else sys.exit(1) if not args.iasl_bin in ('iasl-stable', 'iasl-legacy', 'iasl-dev') and args.rebuild_iasl else print('Invalid selected iasl binary. Exiting...') + sys.exit(1)
+
 
 if args.SysReport is None:
 	print('You must specify a SysReport folder. Exiting.')

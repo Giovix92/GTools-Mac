@@ -39,21 +39,15 @@ if args.rebuild_iasl:
 iasl_bin = args.iasl_bin if os.path.exists(f'{args.iasl_bin}') else f'{downloader.iasl_bin_path}/{args.iasl_bin}' if os.path.exists(f'{downloader.iasl_bin_path}/{args.iasl_bin}') else sys.exit(1) if not args.iasl_bin in ('iasl-stable', 'iasl-legacy', 'iasl-dev') and args.rebuild_iasl else print('Invalid selected iasl binary. Exiting...') + sys.exit(1)
 
 
-if args.SysReport is None:
-	print('You must specify a SysReport folder. Exiting.')
-	sys.exit(1)
-
-if not os.path.exists(args.SysReport):
-	print('SysReport path doesn\'t exist. Exiting.')
-	sys.exit(1)
+print('You must specify a SysReport folder. Exiting.') + sys.exit(1) if args.SysReport is None else ...
+print('SysReport path doesn\'t exist. Exiting.') + sys.exit(1) if not os.path.exists(args.SysReport) else ...
 
 sr_path = args.SysReport
 acpi_path = os.path.join(sr_path, 'SysReport', 'ACPI')
 dsdt_path = os.path.join(acpi_path, 'DSDT.aml')
 
 ''' Recompile IASL, if necessary '''
-if downloader.is_iasl_compiled():
-	downloader.build_iasl()
+downloader.build_iasl() if downloader.is_iasl_compiled() else ...
 
 ''' Get OC logs and get CFG Lock / MAT statuses '''
 os.chdir(sr_path)
@@ -62,24 +56,19 @@ mat_status = logparser.get_mat_support_status(oc_log)
 cfg_lock_status = logparser.cfg_lock_status(oc_log)
 os.chdir(rootdir)
 
-if not os.path.exists(acpi_path) or not os.path.exists(dsdt_path) and args.skip_ssdtgen is False:
-	print('No DSDT.aml or ACPI folder found into the SysReport folder. Unable to proceed.')
-	sys.exit(1)
+print('No DSDT.aml or ACPI folder found into the SysReport folder. Unable to proceed.') + sys.exit(1) if not os.path.exists(acpi_path) or not os.path.exists(dsdt_path) and args.skip_ssdtgen is False else ...
 
 ### SSDT Generation
 if args.skip_ssdtgen is False:
-	if os.path.exists(ssdt_dir):
-		shutil.rmtree(ssdt_dir)
-	os.mkdir(ssdt_dir)
+	shutil.rmtree(ssdt_dir) if os.path.exists(ssdt_dir) else os.mkdir(ssdt_dir)
 	tbp = {'dsdt': f'{dsdt_path}', 'iasl_bin': f'{iasl_bin}'}
 	mkssdt.main(tbp)
 else:
 	print('DSDT decompilation and SSDT generation has been disabled via flag.')
 
 os.system('clear')
-if args.skip_ssdtgen is False:
-	os.system(f'open {ssdt_dir}')
-	print('The generated SSDT folder has been opened.')
+
+os.system(f'open {ssdt_dir}') and print('The generated SSDT folder has been opened.') if args.skip_ssdtgen is False else ...
 print(f'Useful infos regarding this SysReport:')
 print(f'''- MAT Status is: {'1' if mat_status else '0'}''')
 print(f'''- CFG Lock Status is: {'1' if cfg_lock_status else '0'}''')

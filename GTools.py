@@ -36,8 +36,10 @@ if args.rebuild_iasl:
 	else:
 		print('No previous binary files were found.')
 
-iasl_bin = args.iasl_bin if os.path.exists(f'{args.iasl_bin}') else f'{downloader.iasl_bin_path}/{args.iasl_bin}' if os.path.exists(f'{downloader.iasl_bin_path}/{args.iasl_bin}') else sys.exit(1) if not args.iasl_bin in ('iasl-stable', 'iasl-legacy', 'iasl-dev') and args.rebuild_iasl else print('Invalid selected iasl binary. Exiting...') + sys.exit(1)
+''' Recompile IASL, if necessary '''
+downloader.build_iasl() if downloader.is_iasl_compiled() else ...
 
+iasl_bin = args.iasl_bin if os.path.exists(f'{args.iasl_bin}') else f'{downloader.iasl_bin_path}/{args.iasl_bin}' if os.path.exists(f'{downloader.iasl_bin_path}/{args.iasl_bin}') else sys.exit(1) if not args.iasl_bin in ('iasl-stable', 'iasl-legacy', 'iasl-dev') and args.rebuild_iasl else print('Invalid selected iasl binary. Exiting...') + sys.exit(1)
 
 print('You must specify a SysReport folder. Exiting.') + sys.exit(1) if args.SysReport is None else ...
 print('SysReport path doesn\'t exist. Exiting.') + sys.exit(1) if not os.path.exists(args.SysReport) else ...
@@ -45,9 +47,6 @@ print('SysReport path doesn\'t exist. Exiting.') + sys.exit(1) if not os.path.ex
 sr_path = args.SysReport
 acpi_path = os.path.join(sr_path, 'SysReport', 'ACPI')
 dsdt_path = os.path.join(acpi_path, 'DSDT.aml')
-
-''' Recompile IASL, if necessary '''
-downloader.build_iasl() if downloader.is_iasl_compiled() else ...
 
 ''' Get OC logs and get CFG Lock / MAT statuses '''
 os.chdir(sr_path)

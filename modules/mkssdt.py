@@ -1,11 +1,11 @@
 # Copyright (C) 2021-2022 Giovix92
 
 import argparse
+import binascii
 import os
 import shutil
 import subprocess
 import sys
-import binascii
 
 version = 'v1.2'
 dsdt       = None

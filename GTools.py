@@ -14,9 +14,9 @@ dsdt_dsl_path = None
 
 parser = argparse.ArgumentParser(description=f'Generates SSDTs + useful infos starting from a SysReport. Version {version}.', prog='GTools.py')
 parser.add_argument('SysReport', help='SysReport folder full path.', nargs='?', type=str)
-parser.add_argument('--rebuild-iasl', action='store_true', help='Rebuild iasl module.')
 parser.add_argument('--cleanup', action='store_true', help='Cleans up utils/iasl folder and exits.')
 parser.add_argument('--iasl-bin', default='iasl-stable', help='Changes the default used iasl binary.', metavar='iasl_binary', type=str)
+parser.add_argument('--rebuild-iasl', action='store_true', help='Rebuild iasl module.')
 parser.add_argument('--skip-ssdtgen', action='store_true', help='Skips decompilation of DSDT and SSDTs generation.')
 args = parser.parse_args()
 

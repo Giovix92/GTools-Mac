@@ -242,8 +242,6 @@ def fake_ec(dsdt_lines, dsdt_paths):
 		print(' - Could not locate LPC(B)! Aborting!\n')
 		return False
 	print(f' - Found {lpc_name}')
-	comment = 'SSDT-EC'
-	oc = {'Comment':comment,'Enabled':True,'Path':'SSDT-EC.aml'}
 	print('Creating SSDT-EC...')
 	ssdt = '''
 DefinitionBlock ("", "SSDT", 2, "CORP ", "SsdtEC", 0x00001000)

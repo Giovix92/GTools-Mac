@@ -65,7 +65,7 @@ def get_device_paths_with_hid(dsdt_lines, dsdt_paths, hid='ACPI000E'):
 			if 'Device (' in line and len(line)-len(line.lstrip(' ')) < pad:
 				# Add it if it's already in our dsdt_paths - if not, add the current line
 				device = next((x for x in dsdt_paths if x[1]==i-sub),None)
-				devices = [device if device else (line,i-sub)]
+				devices.append(device) if device else devices.append(line,i-sub)
 				break
 	return devices
 
@@ -227,6 +227,7 @@ def fake_ec(dsdt_lines, dsdt_paths):
 				if len(sta):
 					print(' ----> Contains _STA method. Skipping')
 					continue
+				ec_to_patch.append(device)
 			else:
 				print(' ----> NOT Valid EC Device')
 	else:

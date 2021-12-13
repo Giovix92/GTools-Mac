@@ -1,7 +1,6 @@
 # Copyright (C) 2021-2022 Giovix92
 
 import argparse
-import binascii
 import os
 import shutil
 import subprocess
@@ -15,42 +14,31 @@ dsdt_paths = []
 
 ### FUNCTIONS - START ###
 
-def is_hex(line):
+def is_hex(line: str) -> bool:
 	return ':' in line.split('//')[0]
 
-def get_hex_from_int(total, pad_to = 4):
-	hex_str = hex(total)[2:].upper().rjust(pad_to,'0')
-	return ''.join([hex_str[i:i + 2] for i in range(0, len(hex_str), 2)][::-1])
-
-def get_hex(line):
-	# strip the header and commented end
-	return line.split(':')[1].split('//')[0].replace(' ','')
-
-def get_line(line):
+def get_line(line: str) -> str:
 	# Strip the header and commented end - no space replacing though
 	# I don't actually have enough enabled brain cells to create a single line return statement
 	line = line.split('//')[0]
 	return line.split(':')[1] if ':' in line else line
 
-def get_hex_bytes(line):
-	return binascii.unhexlify(line)
-
-def get_path_of_type(dsdt_paths, obj_type='Device', obj='HPET'):
+def get_path_of_type(dsdt_paths: list, obj_type: str='Device', obj: str='HPET') -> list:
 	return sorted([path for path in dsdt_paths if path[2].lower() == obj_type.lower() and path[0].upper().endswith(obj.upper())])
 
-def get_device_paths(dsdt_paths, obj='HPET'):
+def get_device_paths(dsdt_paths: list, obj: str='HPET') -> list:
 	return get_path_of_type(dsdt_paths, obj_type='Device',obj=obj)
 
-def get_method_paths(dsdt_paths, obj='_STA'):
+def get_method_paths(dsdt_paths: list, obj: str='_STA') -> list:
 	return get_path_of_type(dsdt_paths, obj_type='Method',obj=obj)
 
-def get_name_paths(dsdt_paths, obj='CPU0'):
+def get_name_paths(dsdt_paths: list, obj: str='CPU0') -> list:
 	return get_path_of_type(dsdt_paths, obj_type='Name',obj=obj)
 
-def get_processor_paths(dsdt_paths, obj='Processor'):
+def get_processor_paths(dsdt_paths: list, obj: str='Processor') -> list:
 	return get_path_of_type(dsdt_paths, obj_type='Processor',obj=obj)
 
-def get_device_paths_with_hid(dsdt_lines, dsdt_paths, hid='ACPI000E'):
+def get_device_paths_with_hid(dsdt_lines: list, dsdt_paths: list, hid: str='ACPI000E') -> list:
 	starting_indexes = []
 	for index,line in enumerate(dsdt_lines):
 		if is_hex(line): continue
@@ -69,11 +57,11 @@ def get_device_paths_with_hid(dsdt_lines, dsdt_paths, hid='ACPI000E'):
 				break
 	return devices
 
-def _normalize_types(line):
+def _normalize_types(line: str) -> str:
 	# Replaces Name, Processor, Device, and Method with Scope for splitting purposes
 	return line.replace('Name','Scope').replace('Processor','Scope').replace('Device','Scope').replace('Method','Scope')
 
-def get_path_starting_at(starting_index=0):
+def get_path_starting_at(starting_index: int=0) -> tuple:
 	# Walk the scope backwards, keeping track of changes
 	pad = None
 	path = []
@@ -99,7 +87,7 @@ def get_path_starting_at(starting_index=0):
 	path = '\\'+path if path[0] != '\\' else path
 	return (path, dsdt_scope[starting_index][1], obj_type)
 
-def get_scope(dsdt_lines, starting_index=0, add_hex=False, strip_comments=False):
+def get_scope(dsdt_lines: list[str], starting_index: int=0, add_hex: bool=False, strip_comments: bool=False) -> list[str]:
 	# Walks the scope starting at starting_index, and returns when
 	# we've exited
 	brackets = None
@@ -121,7 +109,7 @@ def get_scope(dsdt_lines, starting_index=0, add_hex=False, strip_comments=False)
 			return scope
 	return scope
 
-def get_unique_device(dsdt_paths, path, base_name, starting_number=0, used_names = []):
+def get_unique_device(dsdt_paths: list, base_name: str, starting_number: int=0, used_names: list=[]) -> tuple[str, int]:
 	# Appends a hex number until a unique device is found
 	while True:
 		hex_num = hex(starting_number).replace('0x','').upper()
@@ -130,66 +118,7 @@ def get_unique_device(dsdt_paths, path, base_name, starting_number=0, used_names
 			return (name,starting_number)
 		starting_number += 1
 
-
-def find_previous_hex(dsdt_lines, index=0):
-	# Returns the index of the previous set of hex digits before the passed index
-	start_index = -1
-	end_index   = -1
-	old_hex = True
-	for i,line in enumerate(dsdt_lines[index::-1]):
-		if old_hex:
-			if not is_hex(line):
-				# Broke out of the old hex
-				old_hex = False
-			continue
-		# Not old_hex territory - check if we got new hex
-		if is_hex(line): # Checks for a :, but not in comments
-			end_index = index-i
-			hex_text,start_index = get_hex_ending_at(dsdt_lines, end_index)
-			return (hex_text, start_index, end_index)
-	return ('',start_index,end_index)
-
-def find_next_hex(dsdt_lines, index=0):
-	# Returns the index of the next set of hex digits after the passed index
-	start_index = -1
-	end_index   = -1
-	old_hex = True
-	for i,line in enumerate(dsdt_lines[index:]):
-		if old_hex:
-			if not is_hex(line):
-				# Broke out of the old hex
-				old_hex = False
-			continue
-		# Not old_hex territory - check if we got new hex
-		if is_hex(line): # Checks for a :, but not in comments
-			start_index = i+index
-			hex_text,end_index = get_hex_starting_at(dsdt_lines, start_index)
-			return (hex_text, start_index, end_index)
-	return ('',start_index,end_index)
-
-def get_hex_starting_at(dsdt_lines, start_index):
-	# Returns a tuple of the hex, and the ending index
-	hex_text = ''
-	index = -1
-	for i,x in enumerate(dsdt_lines[start_index:]):
-		if not is_hex(x):
-			break
-		hex_text += get_hex(x)
-		index = i+start_index
-	return (hex_text, index)
-
-def get_hex_ending_at(dsdt_lines, start_index):
-	# Returns a tuple of the hex, and the ending index
-	hex_text = ''
-	index = -1
-	for i,x in enumerate(dsdt_lines[start_index::-1]):
-		if not is_hex(x):
-			break
-		hex_text = get_hex(x)+hex_text
-		index = start_index-i
-	return (hex_text, index)
-
-def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
+def write_ssdt(ssdt_name: str, ssdt: str, iasl_bin: str, results_folder: str) -> bool:
 	if not ssdt:
 		print(f'Unable to generate {ssdt_name}!')
 		return
@@ -201,10 +130,10 @@ def write_ssdt(ssdt_name, ssdt, iasl_bin, results_folder):
 		subprocess.check_call([f'{iasl_bin}', f'{temporary_dsl_path}'], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 	except:
 		print(f'Unable to compile {ssdt_name}!')
-		return
+		return False
 	return True
 
-def fake_ec(dsdt_lines, dsdt_paths):
+def fake_ec(dsdt_lines: list, dsdt_paths: list) -> str:
 	print('\nLocating PNP0C09 (EC) devices...')
 	ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
 	ec_to_patch  = []
@@ -293,7 +222,7 @@ Scope ([[LPCName]])
 '''.replace('[[LPCName]]',lpc_name)
 	return ssdt
 
-def plugin_type(dsdt_lines, dsdt_paths):
+def plugin_type(dsdt_paths: list) -> str:
 	print('\nDetermining CPU name scheme...')
 	try: cpu_name = get_processor_paths(dsdt_paths, '')[0][0]
 	except: cpu_name = None
@@ -333,7 +262,7 @@ Scope ([[CPUName]])
 }'''.replace('[[CPUName]]',cpu_name)
 	return ssdt
 
-def ssdt_pmc(dsdt_lines, dsdt_paths):
+def ssdt_pmc(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
 	print('\nLocating LPC(B)/SBRG...')
 	ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
 	lpc_name = '.'.join(ec_list[0][0].split('.')[:-1]) if len(ec_list) else None
@@ -385,7 +314,7 @@ Scope ([[LPCName]])
 }'''.replace('[[LPCName]]',lpc_name)
 	return ssdt
 
-def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
+def ssdt_awac(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
 	print('\nLocating ACPI000E (AWAC) devices...')
 	awac_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'ACPI000E')
 	if not len(awac_list):
@@ -411,11 +340,6 @@ def ssdt_awac(dsdt_lines, dsdt_paths, dsdt_raw):
 		else: print(' --> Does NOT have STAS variable')
 	else:
 		print(' --> No _STA method found')
-	# Let's find out of we need a unique patch for _STA -> XSTA
-	if len(sta) and not has_stas:
-		print(' --> Generating _STA to XSTA patch')
-		sta_index = find_next_hex(dsdt_lines, sta[0][1])[1]
-		print(f' ----> Found at index {sta_index}')
 
 	print('Locating PNP0B00 (RTC) devices...')
 	rtc_list  = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0B00')
@@ -540,7 +464,7 @@ Scope ([[LPCName]])
 	ssdt += '}'
 	return ssdt
 
-def ssdt_rhub(dsdt_lines, dsdt_paths, dsdt_raw):
+def ssdt_rhub(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
 	illegal_names = ('XHC1','EHC1','EHC2','PXSX')
 	print('\nGathering RHUB/HUBN/URTH devices...')
 	rhubs = get_device_paths(dsdt_paths, 'RHUB')
@@ -565,20 +489,14 @@ def ssdt_rhub(dsdt_lines, dsdt_paths, dsdt_raw):
 			task['device'] = '.'.join(task['device'].split('.')[:-1])
 			task['parent'] = '.'.join(task['device'].split('.')[:-1])
 			if name.startswith('EHC'):
-				task['rename'],ehc_num = get_unique_device(dsdt_paths, task['parent'],'EH01',ehc_num,used_names)
+				task['rename'],ehc_num = get_unique_device(dsdt_paths,'EH01',ehc_num,used_names)
 				ehc_num += 1 # Increment the name number
 			else:
-				task['rename'],xhc_num = get_unique_device(dsdt_paths, task['parent'],'XHCI',xhc_num,used_names)
+				task['rename'],xhc_num = get_unique_device(dsdt_paths,'XHCI',xhc_num,used_names)
 				xhc_num += 1 # Increment the name number
 			used_names.append(task['rename'])
 		else:
 			used_names.append(name)
-		sta_method = get_method_paths(dsdt_paths, task['device']+'._STA')
-		# Let's find out of we need a unique patch for _STA -> XSTA
-		if len(sta_method):
-			print(' ----> Generating _STA to XSTA patch')
-			sta_index = find_next_hex(dsdt_lines, sta_method[0][1])[1]
-			print(f' ------> Found at index {sta_index}')
 		# Let's try to get the _ADR
 		scope_adr = get_name_paths(dsdt_paths, task['device']+'._ADR')
 		task['address'] = dsdt_lines[scope_adr[0][1]].strip() if len(scope_adr) else 'Name (_ADR, Zero)  // _ADR: Address'
@@ -660,7 +578,7 @@ Scope ([[device]])
 
 ### BLOCCO MAIN - START ###
 
-def main(args):
+def main(args: dict) -> None:
 	dsdt = args['dsdt']
 	iasl_bin = args['iasl_bin']
 	print(f'Decompiling {dsdt}...')
@@ -703,10 +621,10 @@ def main(args):
 	paths = sorted([get_path_starting_at(x) for x in starting_indexes])
 
 	write_ssdt('SSDT-EC', fake_ec(dsdt_lines, paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-PLUG', plugin_type(dsdt_lines, paths), iasl_bin, results_folder)
+	write_ssdt('SSDT-PLUG', plugin_type(paths), iasl_bin, results_folder)
 	write_ssdt('SSDT-PMC', ssdt_pmc(dsdt_lines, paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-AWAC', ssdt_awac(dsdt_lines, paths, dsdt_raw), iasl_bin, results_folder)
-	write_ssdt('SSDT-USB-Reset', ssdt_rhub(dsdt_lines, paths, dsdt_raw), iasl_bin, results_folder)
+	write_ssdt('SSDT-AWAC', ssdt_awac(dsdt_lines, paths), iasl_bin, results_folder)
+	write_ssdt('SSDT-USB-Reset', ssdt_rhub(dsdt_lines, paths), iasl_bin, results_folder)
 
 	shutil.rmtree(tmp_dir)
 	dsdt_raw_fo.close()

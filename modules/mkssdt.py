@@ -23,22 +23,22 @@ def get_line(line: str) -> str:
 	line = line.split('//')[0]
 	return line.split(':')[1] if ':' in line else line
 
-def get_path_of_type(dsdt_paths: list, obj_type: str='Device', obj: str='HPET') -> list:
+def get_path_of_type(obj_type: str = 'Device', obj: str = 'HPET') -> list:
 	return sorted([path for path in dsdt_paths if path[2].lower() == obj_type.lower() and path[0].upper().endswith(obj.upper())])
 
-def get_device_paths(dsdt_paths: list, obj: str='HPET') -> list:
-	return get_path_of_type(dsdt_paths, obj_type='Device',obj=obj)
+def get_device_paths(obj: str = 'HPET') -> list:
+	return get_path_of_type(obj_type='Device',obj=obj)
 
-def get_method_paths(dsdt_paths: list, obj: str='_STA') -> list:
-	return get_path_of_type(dsdt_paths, obj_type='Method',obj=obj)
+def get_method_paths(obj: str = '_STA') -> list:
+	return get_path_of_type(obj_type='Method',obj=obj)
 
-def get_name_paths(dsdt_paths: list, obj: str='CPU0') -> list:
-	return get_path_of_type(dsdt_paths, obj_type='Name',obj=obj)
+def get_name_paths(obj: str = 'CPU0') -> list:
+	return get_path_of_type(obj_type='Name',obj=obj)
 
-def get_processor_paths(dsdt_paths: list, obj: str='Processor') -> list:
-	return get_path_of_type(dsdt_paths, obj_type='Processor',obj=obj)
+def get_processor_paths(obj: str = 'Processor') -> list:
+	return get_path_of_type(obj_type='Processor',obj=obj)
 
-def get_device_paths_with_hid(dsdt_lines: list, dsdt_paths: list, hid: str='ACPI000E') -> list:
+def get_device_paths_with_hid(hid: str = 'ACPI000E') -> list:
 	starting_indexes = []
 	for index,line in enumerate(dsdt_lines):
 		if is_hex(line): continue
@@ -87,7 +87,7 @@ def get_path_starting_at(starting_index: int=0) -> tuple:
 	path = '\\'+path if path[0] != '\\' else path
 	return (path, dsdt_scope[starting_index][1], obj_type)
 
-def get_scope(dsdt_lines: list[str], starting_index: int=0, add_hex: bool=False, strip_comments: bool=False) -> list[str]:
+def get_scope(starting_index: int = 0, add_hex: bool = False, strip_comments: bool = False) -> list[str]:
 	# Walks the scope starting at starting_index, and returns when
 	# we've exited
 	brackets = None
@@ -109,7 +109,7 @@ def get_scope(dsdt_lines: list[str], starting_index: int=0, add_hex: bool=False,
 			return scope
 	return scope
 
-def get_unique_device(dsdt_paths: list, base_name: str, starting_number: int=0, used_names: list=[]) -> tuple[str, int]:
+def get_unique_device(base_name: str, starting_number: int = 0, used_names: list = []) -> tuple[str, int]:
 	# Appends a hex number until a unique device is found
 	while True:
 		hex_num = hex(starting_number).replace('0x','').upper()
@@ -121,7 +121,7 @@ def get_unique_device(dsdt_paths: list, base_name: str, starting_number: int=0, 
 def write_ssdt(ssdt_name: str, ssdt: str, iasl_bin: str, results_folder: str) -> bool:
 	if not ssdt:
 		print(f'Unable to generate {ssdt_name}!')
-		return
+		return False
 	temporary_dsl_path = os.path.join(results_folder, ssdt_name+'.dsl')
 	with open(temporary_dsl_path, 'w') as f:
 		f.write(ssdt)
@@ -133,9 +133,9 @@ def write_ssdt(ssdt_name: str, ssdt: str, iasl_bin: str, results_folder: str) ->
 		return False
 	return True
 
-def fake_ec(dsdt_lines: list, dsdt_paths: list) -> str:
+def fake_ec() -> str or bool: 
 	print('\nLocating PNP0C09 (EC) devices...')
-	ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
+	ec_list = get_device_paths_with_hid('PNP0C09')
 	ec_to_patch  = []
 	lpc_name = None
 	if len(ec_list):
@@ -148,11 +148,11 @@ def fake_ec(dsdt_lines: list, dsdt_paths: list) -> str:
 			if device.split('.')[-1] == 'EC':
 				print(' ----> EC called EC. Renaming')
 				device = '.'.join(device.split('.')[:-1]+['EC0'])
-			scope = '\n'.join(get_scope(dsdt_lines, x[1], strip_comments=True))
+			scope = '\n'.join(get_scope(x[1], strip_comments=True))
 			# We need to check for _HID, _CRS, and _GPE
 			if all((y in scope for y in ['_HID','_CRS','_GPE'])):
 				print(' ----> Valid EC Device')
-				sta = get_method_paths(dsdt_paths, device+'._STA')
+				sta = get_method_paths(device+'._STA')
 				if len(sta):
 					print(' ----> Contains _STA method. Skipping')
 					continue
@@ -222,9 +222,9 @@ Scope ([[LPCName]])
 '''.replace('[[LPCName]]',lpc_name)
 	return ssdt
 
-def plugin_type(dsdt_paths: list) -> str:
+def plugin_type() -> str or bool:
 	print('\nDetermining CPU name scheme...')
-	try: cpu_name = get_processor_paths(dsdt_paths, '')[0][0]
+	try: cpu_name = get_processor_paths('')[0][0]
 	except: cpu_name = None
 	if not cpu_name:
 		print(' - Could not locate Processor object! Aborting!\n')
@@ -262,9 +262,9 @@ Scope ([[CPUName]])
 }'''.replace('[[CPUName]]',cpu_name)
 	return ssdt
 
-def ssdt_pmc(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
+def ssdt_pmc() -> str or bool:
 	print('\nLocating LPC(B)/SBRG...')
-	ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
+	ec_list = get_device_paths_with_hid('PNP0C09')
 	lpc_name = '.'.join(ec_list[0][0].split('.')[:-1]) if len(ec_list) else None
 	if lpc_name == None:
 		for x in ('LPCB', 'LPC0', 'LPC', 'SBRG', 'PX40'):
@@ -314,9 +314,9 @@ Scope ([[LPCName]])
 }'''.replace('[[LPCName]]',lpc_name)
 	return ssdt
 
-def ssdt_awac(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
+def ssdt_awac() -> str or bool:
 	print('\nLocating ACPI000E (AWAC) devices...')
-	awac_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'ACPI000E')
+	awac_list = get_device_paths_with_hid('ACPI000E')
 	if not len(awac_list):
 		print(' - Could not locate any ACPI000E devices!  SSDT-AWAC not needed!\n')
 		return False
@@ -324,15 +324,15 @@ def ssdt_awac(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
 	root = awac[0].split('.')[0]
 	print(f' - Found {awac[0]}')
 	print(' --> Verifying _STA...')
-	sta  = get_method_paths(dsdt_paths, awac[0]+'._STA')
-	xsta = get_method_paths(dsdt_paths, awac[0]+'.XSTA')
+	sta  = get_method_paths(awac[0]+'._STA')
+	xsta = get_method_paths(awac[0]+'.XSTA')
 	has_stas = False
 	lpc_name = None
 	if not len(sta) and len(xsta):
 		print(' --> _STA already renamed to XSTA!  Aborting!\n')
 		return False
 	if len(sta):
-		scope = '\n'.join(get_scope(dsdt_lines, sta[0][1], strip_comments=True))
+		scope = '\n'.join(get_scope(sta[0][1], strip_comments=True))
 		if 'STAS' in scope:
 			# We have an STAS var, and should be able to just leverage it
 			has_stas = True
@@ -342,7 +342,7 @@ def ssdt_awac(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
 		print(' --> No _STA method found')
 
 	print('Locating PNP0B00 (RTC) devices...')
-	rtc_list  = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0B00')
+	rtc_list  = get_device_paths_with_hid('PNP0B00')
 	rtc_fake = True
 
 	if len(rtc_list):
@@ -351,13 +351,13 @@ def ssdt_awac(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
 	else: print(' - None found - fake needed!')
 	if rtc_fake:
 		print('Locating LPC(B)/SBRG...')
-		ec_list = get_device_paths_with_hid(dsdt_lines, dsdt_paths, 'PNP0C09')
+		ec_list = get_device_paths_with_hid('PNP0C09')
 		if len(ec_list):
 			lpc_name = '.'.join(ec_list[0][0].split('.')[:-1])
 		if lpc_name == None:
 			for x in ('LPCB', 'LPC0', 'LPC', 'SBRG', 'PX40'):
 				try:
-					lpc_name = get_device_paths(dsdt_paths, x)[0][0]
+					lpc_name = get_device_paths(x)[0][0]
 					break
 				except: pass
 		if not lpc_name:
@@ -464,12 +464,12 @@ Scope ([[LPCName]])
 	ssdt += '}'
 	return ssdt
 
-def ssdt_rhub(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
+def ssdt_rhub() -> str or bool:
 	illegal_names = ('XHC1','EHC1','EHC2','PXSX')
 	print('\nGathering RHUB/HUBN/URTH devices...')
-	rhubs = get_device_paths(dsdt_paths, 'RHUB')
-	rhubs.extend(get_device_paths(dsdt_paths, 'HUBN'))
-	rhubs.extend(get_device_paths(dsdt_paths, 'URTH'))
+	rhubs = get_device_paths('RHUB')
+	rhubs.extend(get_device_paths('HUBN'))
+	rhubs.extend(get_device_paths('URTH'))
 	if not len(rhubs):
 		print(' - None found!  Aborting...\n')
 		return False
@@ -489,16 +489,16 @@ def ssdt_rhub(dsdt_lines: list[str], dsdt_paths: list[str]) -> str:
 			task['device'] = '.'.join(task['device'].split('.')[:-1])
 			task['parent'] = '.'.join(task['device'].split('.')[:-1])
 			if name.startswith('EHC'):
-				task['rename'],ehc_num = get_unique_device(dsdt_paths,'EH01',ehc_num,used_names)
+				task['rename'],ehc_num = get_unique_device('EH01',ehc_num,used_names)
 				ehc_num += 1 # Increment the name number
 			else:
-				task['rename'],xhc_num = get_unique_device(dsdt_paths,'XHCI',xhc_num,used_names)
+				task['rename'],xhc_num = get_unique_device('XHCI',xhc_num,used_names)
 				xhc_num += 1 # Increment the name number
 			used_names.append(task['rename'])
 		else:
 			used_names.append(name)
 		# Let's try to get the _ADR
-		scope_adr = get_name_paths(dsdt_paths, task['device']+'._ADR')
+		scope_adr = get_name_paths(task['device']+'._ADR')
 		task['address'] = dsdt_lines[scope_adr[0][1]].strip() if len(scope_adr) else 'Name (_ADR, Zero)  // _ADR: Address'
 		tasks.append(task)
 	ssdt = '''//
@@ -604,6 +604,8 @@ def main(args: dict) -> None:
 	
 	dsdt_fo = open(dsdt_dsl, 'r')
 	dsdt = dsdt_fo.read()
+
+	global dsdt_lines
 	dsdt_lines = dsdt.split('\n')
 
 	global dsdt_scope
@@ -618,13 +620,14 @@ def main(args: dict) -> None:
 
 
 	if not len(starting_indexes): return None
-	paths = sorted([get_path_starting_at(x) for x in starting_indexes])
+	global dsdt_paths
+	dsdt_paths = sorted([get_path_starting_at(x) for x in starting_indexes])
 
-	write_ssdt('SSDT-EC', fake_ec(dsdt_lines, paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-PLUG', plugin_type(paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-PMC', ssdt_pmc(dsdt_lines, paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-AWAC', ssdt_awac(dsdt_lines, paths), iasl_bin, results_folder)
-	write_ssdt('SSDT-USB-Reset', ssdt_rhub(dsdt_lines, paths), iasl_bin, results_folder)
+	write_ssdt('SSDT-EC', fake_ec(), iasl_bin, results_folder)
+	write_ssdt('SSDT-PLUG', plugin_type(), iasl_bin, results_folder)
+	write_ssdt('SSDT-PMC', ssdt_pmc(), iasl_bin, results_folder)
+	write_ssdt('SSDT-AWAC', ssdt_awac(), iasl_bin, results_folder)
+	write_ssdt('SSDT-USB-Reset', ssdt_rhub(), iasl_bin, results_folder)
 
 	shutil.rmtree(tmp_dir)
 	dsdt_raw_fo.close()

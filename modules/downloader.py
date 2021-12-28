@@ -26,7 +26,7 @@ def download_compiling_scripts() -> None:
 			wget.download('https://raw.githubusercontent.com/Giovix92/MaciASL/master/Dist/build_iasl.sh')
 			print('\n')
 		except Exception as e:
-			print(f'An error occurred while downloading the file: {e}')
+			print(f'An error occurred while downloading build_iasl.sh: {e}')
 			sys.exit(1)
 
 	if 'acpica-legacy.diff' not in dir_ls:
@@ -35,7 +35,7 @@ def download_compiling_scripts() -> None:
 			wget.download('https://raw.githubusercontent.com/acidanthera/MaciASL/master/Dist/acpica-legacy.diff')
 			print('\n')
 		except Exception as e:
-			print(f'An error occurred while downloading the file: {e}')
+			print(f'An error occurred while downloading acpica-legacy.diff: {e}')
 			sys.exit(1)
 
 	os.chdir(main_dir)
@@ -43,8 +43,6 @@ def download_compiling_scripts() -> None:
 def compile_iasl() -> None:
 	'''If iasl binaries are not installed in bin subdirectory then compile them'''
 	
-	dir_ls = os.listdir(iasl_path)
-
 	try:
 		if not os.path.exists(iasl_bin_path):
 			os.mkdir(iasl_bin_path)        

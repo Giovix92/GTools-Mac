@@ -65,7 +65,7 @@ def get_path_starting_at(starting_index: int=0) -> tuple:
 	# Walk the scope backwards, keeping track of changes
 	pad = None
 	path = []
-	obj_type = next((x for x in ('Processor','Method','Scope','Device','Name') if x+' (' in dsdt_scope[starting_index][0]),'Unknown Type')
+	obj_type = next((x for x in ('Processor','Method','Scope','Device','Name') if f'{x} (' in dsdt_scope[starting_index][0]),'Unknown Type')
 	for scope,original_index in dsdt_scope[starting_index::-1]:
 		new_pad = _normalize_types(scope).split('Scope (')[0]
 		if pad == None or new_pad < pad:
@@ -84,7 +84,7 @@ def get_path_starting_at(starting_index: int=0) -> tuple:
 			new_path.append(x.replace('^','')) # Add the original, removing any ^ chars
 		path = new_path
 	path = '.'.join(path)
-	path = '\\'+path if path[0] != '\\' else path
+	path = f'\\{path}' if path[0] != '\\' else path
 	return (path, dsdt_scope[starting_index][1], obj_type)
 
 def get_scope(starting_index: int = 0, add_hex: bool = False, strip_comments: bool = False) -> list[str]:
@@ -114,7 +114,7 @@ def get_unique_device(base_name: str, starting_number: int = 0, used_names: list
 	while True:
 		hex_num = hex(starting_number).replace('0x','').upper()
 		name = base_name[:-1*len(hex_num)]+hex_num
-		if not len(get_device_paths(dsdt_paths, '.'+name)) and not name in used_names:
+		if not len(get_device_paths(f'.{name}')) and not name in used_names:
 			return (name,starting_number)
 		starting_number += 1
 
@@ -122,7 +122,7 @@ def write_ssdt(ssdt_name: str, ssdt: str, iasl_bin: str, results_folder: str) ->
 	if not ssdt:
 		print(f'Unable to generate {ssdt_name}!')
 		return False
-	temporary_dsl_path = os.path.join(results_folder, ssdt_name+'.dsl')
+	temporary_dsl_path = os.path.join(results_folder, f'{ssdt_name}.dsl')
 	with open(temporary_dsl_path, 'w') as f:
 		f.write(ssdt)
 	print('Compiling...')
@@ -152,7 +152,7 @@ def fake_ec() -> str or bool:
 			# We need to check for _HID, _CRS, and _GPE
 			if all((y in scope for y in ['_HID','_CRS','_GPE'])):
 				print(' ----> Valid EC Device')
-				sta = get_method_paths(device+'._STA')
+				sta = get_method_paths(f'{device}._STA')
 				if len(sta):
 					print(' ----> Contains _STA method. Skipping')
 					continue
@@ -324,8 +324,8 @@ def ssdt_awac() -> str or bool:
 	root = awac[0].split('.')[0]
 	print(f' - Found {awac[0]}')
 	print(' --> Verifying _STA...')
-	sta  = get_method_paths(awac[0]+'._STA')
-	xsta = get_method_paths(awac[0]+'.XSTA')
+	sta  = get_method_paths(f'{awac[0]}._STA')
+	xsta = get_method_paths(f'{awac[0]}.XSTA')
 	has_stas = False
 	lpc_name = None
 	if not len(sta) and len(xsta):
@@ -498,7 +498,7 @@ def ssdt_rhub() -> str or bool:
 		else:
 			used_names.append(name)
 		# Let's try to get the _ADR
-		scope_adr = get_name_paths(task['device']+'._ADR')
+		scope_adr = get_name_paths(f"{task['device']}._ADR")
 		task['address'] = dsdt_lines[scope_adr[0][1]].strip() if len(scope_adr) else 'Name (_ADR, Zero)  // _ADR: Address'
 		tasks.append(task)
 	ssdt = '''//
